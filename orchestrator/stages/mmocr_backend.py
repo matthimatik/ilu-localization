@@ -9,9 +9,20 @@ from orchestrator.stages.util import load_model, resolve_path
 from schemas.image import ImageRef
 from schemas.vision import TextSpot, TextSpots
 
-DEFAULT_DET = "dbnetpp_resnet50-dcnv2_fpnc_1200e_icdar2015"
+DEFAULT_DET = "configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.py"
+DEFAULT_DET_WEIGHTS = (
+    "work_dirs/dbnetpp_trudi_200e/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.pth"
+)
 DEFAULT_REC = "RobustScanner"
 DEFAULT_TIMEOUT_S = 600.0
+
+
+def resolve_backend_model(value: str, backend_dir: Path) -> str:
+    """Resolve a config/weights path against ``backend_dir``; pass aliases through."""
+    path = Path(value)
+    if path.suffix in {".py", ".pth", ".pt", ".ckpt"} and not path.is_absolute():
+        return str(backend_dir / path)
+    return value
 
 
 def text_spots_from_runner(data: dict, image_path: str) -> TextSpots:
@@ -54,6 +65,8 @@ class MmocrBackendStage:
 
         out_path = ctx.store.stage_dir(ctx.stage_name) / "raw" / "ocr.json"
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        det = resolve_backend_model(ctx.cfg.get("det", DEFAULT_DET), backend_dir)
+        det_weights = ctx.cfg.get("det_weights", DEFAULT_DET_WEIGHTS)
         cmd = [
             str(python),
             str(runner),
@@ -62,10 +75,15 @@ class MmocrBackendStage:
             "--out",
             str(out_path),
             "--det",
-            str(ctx.cfg.get("det", DEFAULT_DET)),
+            det,
             "--rec",
             str(ctx.cfg.get("rec", DEFAULT_REC)),
         ]
+        if det_weights:
+            cmd += [
+                "--det-weights",
+                resolve_backend_model(str(det_weights), backend_dir),
+            ]
         if "device" in ctx.cfg:
             cmd += ["--device", str(ctx.cfg["device"])]
 

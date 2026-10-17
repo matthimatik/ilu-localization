@@ -10,7 +10,15 @@ def main() -> int:
     )
     parser.add_argument("--image", required=True)
     parser.add_argument(
-        "--det", default="dbnetpp_resnet50-dcnv2_fpnc_1200e_icdar2015"
+        "--det",
+        default="configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.py",
+    )
+    parser.add_argument(
+        "--det-weights",
+        default=(
+            "work_dirs/dbnetpp_trudi_200e/"
+            "dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.pth"
+        ),
     )
     parser.add_argument("--rec", default="RobustScanner")
     parser.add_argument("--device", default=None)
@@ -20,7 +28,12 @@ def main() -> int:
     from mmocr.apis.inferencers import MMOCRInferencer
     from mmocr.utils import bbox2poly, poly2bbox
 
-    inferencer = MMOCRInferencer(det=args.det, rec=args.rec, device=args.device)
+    inferencer = MMOCRInferencer(
+        det=args.det,
+        det_weights=args.det_weights,
+        rec=args.rec,
+        device=args.device,
+    )
     result = inferencer(args.image, batch_size=1)
     pred = result["predictions"][0]
     polygons = pred.get("det_polygons") or []

@@ -22,11 +22,11 @@ stages:
     cfg:
       backend_dir: ../ilu-pose-estimation
   - name: textspots
-    impl: fixture_textspots
+    impl: mmocr
     inputs:
       image: load_image/image_ref
     cfg:
-      source: tests/fixtures/textspots_empty.json
+      backend_dir: ../mmocr
   - name: embeddings
     impl: fixture_embeddings
     inputs:

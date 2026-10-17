@@ -13,7 +13,7 @@ DEFAULT_TIMEOUT_S = 300.0
 UV_MATCH_TOL_PX = 1e-3
 
 
-def _match_pnp(det: dict, pnp_boxes: list[dict]) -> dict | None:
+def match_pnp(det: dict, pnp_boxes: list[dict]) -> dict | None:
     det_uv = det["uv"]
     for box in pnp_boxes:
         box_uv = box.get("uv") or []
@@ -48,7 +48,7 @@ def pose_boxes_from_backend(
     pnp_method: str = boxes_json["method"] if boxes_json else "yolo"
     built: list[PoseBox] = []
     for index, det in enumerate(detections["detections"]):
-        match = _match_pnp(det, pnp_boxes)
+        match = match_pnp(det, pnp_boxes)
         if det.get("type_hint") is not None:
             size_class = str(det["type_hint"])
         elif match is not None:

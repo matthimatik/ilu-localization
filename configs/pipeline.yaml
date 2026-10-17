@@ -1,0 +1,48 @@
+pipeline: fixture-e2e
+stages:
+  - name: load_image
+    impl: load_image
+    cfg:
+      image: tests/fixtures/image.png
+      camera:
+        intrinsics:
+          fx: 4000.0
+          fy: 4000.0
+          cx: 1920.0
+          cy: 1080.0
+          width: 3840
+          height: 2160
+  - name: textspots
+    impl: fixture_textspots
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      source: tests/fixtures/textspots.json
+  - name: poseboxes
+    impl: fixture_poseboxes
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      source: tests/fixtures/poseboxes.json
+  - name: embeddings
+    impl: fixture_embeddings
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      source: tests/fixtures/embeddings.json
+  - name: associate
+    impl: associate
+    inputs:
+      text_spots: textspots/text_spots
+      pose_boxes: poseboxes/pose_boxes
+      embeddings: embeddings/embeddings
+    cfg:
+      margin_px: 0.0
+  - name: fuse
+    impl: fuse
+    inputs:
+      associations: associate/associations
+      text_spots: textspots/text_spots
+      pose_boxes: poseboxes/pose_boxes
+      embeddings: embeddings/embeddings
+      image_ref: load_image/image_ref

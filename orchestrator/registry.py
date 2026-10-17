@@ -8,12 +8,14 @@ from orchestrator.stages.fixture import (
 )
 from orchestrator.stages.fuse import FuseStage
 from orchestrator.stages.load_image import LoadImageStage
+from orchestrator.stages.pose import PoseBackendStage
 
 _REGISTRY: dict[str, type] = {
     "load_image": LoadImageStage,
     "fixture_textspots": FixtureTextSpotsStage,
     "fixture_poseboxes": FixturePoseBoxesStage,
     "fixture_embeddings": FixtureEmbeddingsStage,
+    "pose": PoseBackendStage,
     "associate": AssociateStage,
     "fuse": FuseStage,
 }

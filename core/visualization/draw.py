@@ -90,7 +90,7 @@ def _size_part(record: ILURecord) -> str:
 
 def _label_lines(record: ILURecord) -> tuple[str, str]:
     iso = record.iso_code or "no code"
-    first = f"#{record.ilu_id}  {record.category}{_size_part(record)}  {iso}"
+    first = f"{record.ilu_id}  {record.category}{_size_part(record)}  {iso}"
     confs = record.confidences or {}
     parts = [record.identification_method.value]
     for key in ("pose", "ocr", "text_match"):
@@ -109,6 +109,11 @@ class Label(NamedTuple):
     badge: bool  # instance-color chip with just the id (keeps busy scenes readable)
 
 
+def short_id(ilu_id: str) -> str:
+    """Badge form of an ilu id: the part after the last hyphen (`det-0` → `0`)."""
+    return ilu_id.rsplit("-", 1)[-1] if "-" in ilu_id else ilu_id
+
+
 def record_label_items(records: list[ILURecord], mode: str = "ids") -> list[Label]:
     """What to draw per record.
 
@@ -118,13 +123,16 @@ def record_label_items(records: list[ILURecord], mode: str = "ids") -> list[Labe
     """
     if mode == "none":
         return []
+    shorts = [short_id(record.ilu_id) for record in records]
+    unique = len(set(shorts)) == len(shorts)
     labels: list[Label] = []
     for index, record in enumerate(records):
         if mode == "all":
             first, second = _label_lines(record)
             labels.append(Label(record, index, first, second, badge=False))
         else:
-            labels.append(Label(record, index, f"#{record.ilu_id}", None, badge=True))
+            text = shorts[index] if unique else record.ilu_id
+            labels.append(Label(record, index, text, None, badge=True))
     return labels
 
 
@@ -428,6 +436,32 @@ TABLE_HEADERS = [
     "id", "category", "size", "ISO 6346", "ident", "box",
     "pose", "ocr", "text_match", "#spots", "OCR texts",
 ]
+# Last column: spots wrap into multiple lines and soak up the leftover width.
+OCR_COLUMN = len(TABLE_HEADERS) - 1
+
+
+def _ocr_items(cell: str) -> list[str]:
+    """One `text confidence` item per associated spot."""
+    return [] if cell in ("—", "") else cell.split(", ")
+
+
+def _wrap_items(
+    items: list[str], fs: float, tf: int, avail: int
+) -> list[str]:
+    """Greedy line wrapping of `text confidence` items into `avail` pixels."""
+    lines: list[str] = []
+    current = ""
+    for item in items:
+        item = _fit_cell(item, fs, tf, avail)
+        candidate = f"{current}, {item}" if current else item
+        if current and cv2.getTextSize(candidate, FONT, fs, tf)[0][0] > avail:
+            lines.append(current)
+            current = item
+        else:
+            current = candidate
+    if current:
+        lines.append(current)
+    return lines
 
 
 def _spots_by_id(
@@ -494,7 +528,9 @@ def build_record_table(
     """Detail table strip appended below the overlay image.
 
     One header + one row per record, id column swatched in the instance color
-    so rows tie back to the badges and wireframes in the image above.
+    so rows tie back to the badges and wireframes in the image above. The OCR
+    texts column gets all leftover width and wraps onto extra lines, so long
+    spot lists stay readable instead of being ellipsized.
     """
     u = min(12 * lw, width / 70)
     margin = int(u * 1.2)
@@ -507,59 +543,93 @@ def build_record_table(
     fs = u * 0.75 / 22
     tf = max(1, round(u / 10))
 
-    def col_widths(scale: float, thickness: int) -> list[int]:
+    def text_px(text: str, scale: float, thickness: int, bold: bool = False) -> int:
+        return cv2.getTextSize(text, FONT, scale, thickness + (1 if bold else 0))[0][0]
+
+    def fixed_widths(scale: float, thickness: int) -> list[int]:
+        """Widths of every column except the OCR texts column."""
         widths = []
         for column, header in enumerate(headers):
-            width_px = cv2.getTextSize(header, FONT, scale, thickness + 1)[0][0]
+            if column == OCR_COLUMN:
+                continue
+            width_px = text_px(header, scale, thickness, bold=True)
             for row in rows:
-                cell = row[column]
                 pad = swatch + int(u * 0.3) if column == 0 else 0
-                width_px = max(
-                    width_px, cv2.getTextSize(cell, FONT, scale, thickness)[0][0] + pad
-                )
+                width_px = max(width_px, text_px(row[column], scale, thickness) + pad)
             widths.append(width_px + int(u * 0.8))
         return widths
 
+    def min_ocr_width(scale: float, thickness: int) -> int:
+        widest = text_px(headers[OCR_COLUMN], scale, thickness, bold=True)
+        for row in rows:
+            for item in _ocr_items(row[OCR_COLUMN]):
+                widest = max(widest, text_px(item, scale, thickness))
+        return widest + int(u * 0.8)
+
     for _ in range(5):
-        widths = col_widths(fs, tf)
-        if sum(widths) + 2 * margin <= width:
+        if sum(fixed_widths(fs, tf)) + min_ocr_width(fs, tf) + 2 * margin <= width:
             break
         fs *= 0.9
+    fixed = fixed_widths(fs, tf)
+    ocr_w = max(min_ocr_width(fs, tf), width - 2 * margin - sum(fixed))
+    col_x = [margin]
+    for w in fixed:
+        col_x.append(col_x[-1] + w)
+
     text_h = cv2.getTextSize("Ag", FONT, fs, tf)[0][1]
-    row_h = max(int(u * 1.25), text_h + int(u * 0.7))
-    header_h = row_h + int(u * 0.2)
+    line_step = text_h + int(u * 0.55)
+    ocr_avail = int(ocr_w - u * 0.4)
+    row_lines = [
+        _wrap_items(_ocr_items(row[OCR_COLUMN]), fs, tf, ocr_avail) or ["—"]
+        for row in rows
+    ]
+    row_heights = [
+        max(int(u * 1.25), len(lines) * line_step + int(u * 0.55))
+        for lines in row_lines
+    ]
+    base_row_h = int(u * 1.25)
+    header_h = base_row_h + int(u * 0.2)
     note_h = int(u * 1.1) if note else 0
-    height = int(header_h + row_h * max(len(rows), 1) + u * 0.4 + note_h)
+    height = int(header_h + sum(row_heights) + u * 0.4 + note_h)
     im = np.full((height, width, 3), TABLE_BG, np.uint8)
     cv2.rectangle(im, (0, 0), (width, int(header_h)), TABLE_HEADER_BG, -1)
 
-    xs = [margin]
-    for w in widths:
-        xs.append(xs[-1] + w)
     header_baseline = int((header_h + text_h) / 2)
     for column, header in enumerate(headers):
-        put_text(im, header, (xs[column], header_baseline), fs, (255, 255, 255), tf + 1)
+        x = col_x[column] if column != OCR_COLUMN else col_x[-1]
+        put_text(im, header, (x, header_baseline), fs, (255, 255, 255), tf + 1)
 
+    y = header_h
     for r, row in enumerate(rows):
-        y0 = int(header_h + r * row_h)
+        row_h = row_heights[r]
+        y0 = int(y)
         if r % 2 == 1:
             cv2.rectangle(im, (0, y0), (width, y0 + int(row_h)), TABLE_ROW_ALT_BG, -1)
-        baseline = y0 + int((row_h + text_h) / 2)
+        lines = row_lines[r]
+        block_h = len(lines) * line_step
+        first_baseline = y0 + max(int(u * 0.35), (row_h - block_h) // 2) + text_h
         cv2.circle(
             im,
-            (xs[0] + swatch // 2, baseline - text_h // 3),
+            (col_x[0] + swatch // 2, first_baseline - text_h // 3),
             swatch // 2,
             record_color(r),
             -1,
             cv2.LINE_AA,
         )
         for column, cell in enumerate(row):
-            x = xs[column] + (swatch + int(u * 0.3) if column == 0 else 0)
-            avail = xs[column + 1] - x - int(u * 0.4)
-            put_text(im, _fit_cell(cell, fs, tf, int(avail)), (x, baseline), fs, (230, 230, 230), tf)
+            if column == OCR_COLUMN:
+                continue
+            x = col_x[column] + (swatch + int(u * 0.3) if column == 0 else 0)
+            put_text(im, cell, (x, first_baseline), fs, (230, 230, 230), tf)
+        for i, line in enumerate(lines):
+            put_text(
+                im, line, (col_x[-1], first_baseline + i * line_step),
+                fs, (230, 230, 230), tf,
+            )
+        y += row_h
 
     if note:
-        note_y = int(header_h + row_h * max(len(rows), 1) + u * 0.9)
+        note_y = int(y + u * 0.9)
         put_text(im, note, (margin, note_y), fs * 0.9, (200, 200, 200), tf)
     return im
 

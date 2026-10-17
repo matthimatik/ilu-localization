@@ -16,7 +16,9 @@ from core.visualization import (
     write_html,
 )
 from core.visualization.draw import (
+    FONT,
     _overlaps,
+    _wrap_items,
     plan_labels,
     record_label_items,
     record_table_cells,
@@ -83,8 +85,23 @@ def test_labels_default_to_id_badges():
     items = record_label_items(records)
 
     assert all(item.badge for item in items)
-    assert [item.text for item in items] == ["#box-A", "#box-B"]
+    assert [item.text for item in items] == ["A", "B"]  # short id after the hyphen
     assert all(item.sub is None for item in items)
+
+
+def test_badges_fall_back_to_full_id_on_collisions():
+    records = [
+        ILURecord(
+            ilu_id=ilu_id,
+            category="container",
+            identification_method=IdentificationMethod.unknown,
+        )
+        for ilu_id in ("det-1", "box-1")
+    ]
+
+    items = record_label_items(records)
+
+    assert [item.text for item in items] == ["det-1", "box-1"]
 
 
 def test_scene_from_fixture_run(fixture_run, tmp_path):
@@ -219,6 +236,18 @@ def test_scene_iso_tags_and_spot_markers():
         [marker.x[0], marker.y[0], marker.z[0]], (0.0, 0.0, 2.0)
     )
     assert "OCR: BMOU2372713 0.90" in by_name["code"].hovertext
+
+
+def test_ocr_cell_items_wrap_without_loss():
+    items = [f"TEXT{i:04d} 0.9{i}" for i in range(8)]
+
+    lines = _wrap_items(items, 0.5, 1, 140)
+
+    assert len(lines) > 1
+    assert ", ".join(lines) == ", ".join(items)  # wrapping never drops an item
+    assert all(
+        cv2.getTextSize(line, FONT, 0.5, 1)[0][0] <= 140 for line in lines
+    )
 
 
 def test_record_table_lists_details(fixture_run):

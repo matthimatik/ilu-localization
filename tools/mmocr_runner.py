@@ -21,6 +21,12 @@ def main() -> int:
         ),
     )
     parser.add_argument("--rec", default="RobustScanner")
+    parser.add_argument(
+        "--rec-weights",
+        default=None,
+        help="recognition checkpoint path (release-layout .pth); "
+        "omit to use the stock RobustScanner weights",
+    )
     parser.add_argument("--device", default=None)
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
@@ -32,6 +38,7 @@ def main() -> int:
         det=args.det,
         det_weights=args.det_weights,
         rec=args.rec,
+        rec_weights=args.rec_weights,
         device=args.device,
     )
     result = inferencer(args.image, batch_size=1)

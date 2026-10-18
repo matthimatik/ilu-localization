@@ -39,7 +39,7 @@ Three importable packages at repo root (not `src/`): `schemas/` (pydantic models
 ## External backends (sibling directories, not vendored)
 
 - Pose: `../ilu-pose-estimation` — stage shells out to `uv run pipeline/run.py` there (needs `uv` on PATH, GPU). Default weights `models/container-corners-yolov8m-1280.pt` under that repo.
-- OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the TRUDI id_text fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_200e_trudi`, config + weights resolved relative to the mmocr repo root; override with stage cfg `det` / `det_weights`); default rec: RobustScanner. Runner imports mmocr inside the backend venv.
+- OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the TRUDI id_text fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_200e_trudi`), default rec is RobustScanner fine-tuned on TRUDI id_text crops (`robustscanner_resnet31_20e_trudi`); config/weights paths resolve relative to the mmocr repo root, override with stage cfg `det` / `det_weights` / `rec` / `rec_weights`. Runner imports mmocr inside the backend venv.
 - Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_mmocr.py`.
 
 ## Testing

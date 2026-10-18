@@ -14,6 +14,9 @@ DEFAULT_DET_WEIGHTS = (
     "work_dirs/dbnetpp_trudi_200e/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.pth"
 )
 DEFAULT_REC = "RobustScanner"
+DEFAULT_REC_WEIGHTS = (
+    "work_dirs/robustscanner_trudi_20e/robustscanner_resnet31_20e_trudi.pth"
+)
 DEFAULT_TIMEOUT_S = 600.0
 
 
@@ -83,6 +86,12 @@ class MmocrBackendStage:
             cmd += [
                 "--det-weights",
                 resolve_backend_model(str(det_weights), backend_dir),
+            ]
+        rec_weights = ctx.cfg.get("rec_weights", DEFAULT_REC_WEIGHTS)
+        if rec_weights:
+            cmd += [
+                "--rec-weights",
+                resolve_backend_model(str(rec_weights), backend_dir),
             ]
         if "device" in ctx.cfg:
             cmd += ["--device", str(ctx.cfg["device"])]

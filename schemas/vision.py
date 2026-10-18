@@ -47,3 +47,17 @@ class Embedding(BaseModel):
 class Embeddings(BaseModel):
     schema_version: str = SCHEMA_VERSION
     embeddings: list[Embedding]
+
+
+class Instance(BaseModel):
+    instance_id: str
+    label: str
+    confidence: float = Field(ge=0.0, le=1.0)
+    bbox_px: tuple[float, float, float, float]
+    polygon_px: list[Point2D]
+
+
+class Instances(BaseModel):
+    schema_version: str = SCHEMA_VERSION
+    image_path: str
+    instances: list[Instance]

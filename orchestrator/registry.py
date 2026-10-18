@@ -7,6 +7,7 @@ from orchestrator.stages.fixture import (
     FixtureTextSpotsStage,
 )
 from orchestrator.stages.fuse import FuseStage
+from orchestrator.stages.instanceseg import InstancesegBackendStage
 from orchestrator.stages.load_image import LoadImageStage
 from orchestrator.stages.mmocr_backend import MmocrBackendStage
 from orchestrator.stages.pose import PoseBackendStage
@@ -18,6 +19,7 @@ _REGISTRY: dict[str, type] = {
     "fixture_embeddings": FixtureEmbeddingsStage,
     "pose": PoseBackendStage,
     "mmocr": MmocrBackendStage,
+    "instanceseg": InstancesegBackendStage,
     "associate": AssociateStage,
     "fuse": FuseStage,
 }

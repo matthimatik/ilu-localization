@@ -39,8 +39,10 @@ Three importable packages at repo root (not `src/`): `schemas/` (pydantic models
 ## External backends (sibling directories, not vendored)
 
 - Pose: `../ilu-pose-estimation` — stage shells out to `uv run pipeline/run.py` there (needs `uv` on PATH, GPU). Default weights `models/container-corners-yolov8m-1280.pt` under that repo.
+- Instance segmentation: `../ilu-detection` — stage shells out to `uv run python segmentation/infer.py` there (needs `uv` on PATH, GPU). Default weights `models/ilu-seg-yolov8m-1024.pt` (TRUDI v2, classes `container`/`tank_container`/`trailer`); overrides via stage cfg `weights` / `imgsz` / `conf` / `max_det` / `device`. Writes the `instances` artifact (`schemas/vision.py:Instances`); not yet consumed by `associate`/`fuse`.
 - OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the TRUDI id_text fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_200e_trudi`), default rec is RobustScanner fine-tuned on TRUDI id_text crops (`robustscanner_resnet31_20e_trudi`); config/weights paths resolve relative to the mmocr repo root, override with stage cfg `det` / `det_weights` / `rec` / `rec_weights`. Runner imports mmocr inside the backend venv.
-- Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_mmocr.py`.
+- Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_instanceseg.py`, `uv run python tools/smoke_mmocr.py`.
+- `configs/pipeline_backends.yaml` runs pose + instanceseg + mmocr on the synthetic drone scene; `configs/pipeline_pose.yaml` stays pose+mmocr only.
 
 ## Testing
 

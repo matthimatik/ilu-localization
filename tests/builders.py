@@ -1,3 +1,4 @@
+from schemas.identification import IdentifiedILU, IdentifiedILUs, IdSizeType
 from schemas.vision import Corner, Embedding, Embeddings, PoseBox, PoseBoxes, TextSpot, TextSpots
 
 
@@ -64,3 +65,30 @@ def make_embeddings(pairs: list[tuple[str, list[float]]]) -> Embeddings:
     return Embeddings(
         embeddings=[Embedding(crop_id=cid, vector=vec) for cid, vec in pairs]
     )
+
+
+def make_identified(
+    ilu_id: str = "box-A",
+    ilu_type: str = "container",
+    id_code: str | None = "BMOU2372713",
+    id_scheme: str = "iso6346",
+    id_valid: bool = True,
+    id_confidence: float = 0.95,
+    method: str = "code",
+    size_type_code: str | None = None,
+) -> IdentifiedILU:
+    size_type = IdSizeType(code=size_type_code) if size_type_code else None
+    return IdentifiedILU(
+        ilu_id=ilu_id,
+        ilu_type=ilu_type,
+        id_code=id_code,
+        id_scheme=id_scheme,
+        id_valid=id_valid,
+        id_confidence=id_confidence,
+        method=method,
+        size_type=size_type,
+    )
+
+
+def make_identified_ilus(entries: list[IdentifiedILU]) -> IdentifiedILUs:
+    return IdentifiedILUs(image_path="img.png", results=entries)

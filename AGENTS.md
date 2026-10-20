@@ -14,6 +14,7 @@ uv run python tools/run_pipeline.py --config configs/pipeline_pose.yaml  # real 
 uv run python tools/run_pipeline.py --no-cache
 uv run python tools/visualize_run.py                 # end-result viz of newest successful run -> runs/<id>/viz/
 uv run python tools/visualize_run.py --run-id <id> --open
+uv run python tools/smoke_identify.py                # identify stage alone (needs ../ilu-identification)
 ```
 
 No lint/typecheck/format tooling or CI is configured. Python `>=3.11`, managed with `uv` (`uv.lock` present). Drawing deps: `opencv-python-headless`, `plotly` (visualization only).
@@ -30,23 +31,27 @@ Three importable packages at repo root (not `src/`): `schemas/` (pydantic models
 
 ## Pipeline architecture
 
+Pipeline order: `load_image → (pose/mmocr/fixtures) → associate → identify → fuse`. The `identify` stage converts associated text spots into validated id codes (ISO 6346 / EN 13044-1 / registration number) via the sibling `../ilu-identification` repo; `fuse` then merges pose + identification + embeddings into `ILURecord`s. `fuse` keeps its legacy spot-picking fallback when the optional `ilu_ids` input is absent.
+
 - Stages only exchange data as JSON artifacts via `ArtifactStore` under `runs/<run_id>/<stage>/<name>.json`. Config `inputs` use `"stage_name/artifact"` refs; a missing artifact fails the stage.
 - New stage types must be registered in `orchestrator/registry.py` `_REGISTRY` (string `impl` in YAML → class). Implement the `Stage` protocol (`name` attr, `run(ctx)`); write results with `ctx.store.write_model`.
 - `orchestrator/config.py:build_pipeline` injects `_base_dir` into every stage `cfg` — relative paths in YAML resolve against it (repo root when using `tools/run_pipeline.py`). Use `resolve_path(ctx, key)` for cfg path keys.
 - First failed stage aborts the run (`orchestrator/dag.py`); the `manifest` is rewritten after each stage. Stage output hashing only globs `*.json` directly in the stage dir (not `raw/` subdirs).
-- Content-addressed stage cache in `.cache/stages` (key: stage class + cfg JSON + input file hashes). `--no-cache` bypasses; cache copies only top-level files, not subdirectories like `raw/`.
+- Content-addressed stage cache in `.cache/stages` (key: stage class + cfg JSON + input file hashes). `--no-cache` bypasses; cache copies only top-level files, not subdirectories like `raw/`. The cache does **not** hash sibling source code — after changing `../ilu-identification`, rerun with `--no-cache`.
 
 ## External backends (sibling directories, not vendored)
 
 - Pose: `../ilu-pose-estimation` — stage shells out to `uv run pipeline/run.py` there (needs `uv` on PATH, GPU). Default weights `models/container-corners-yolov8m-1280.pt` under that repo.
 - Instance segmentation: `../ilu-detection` — stage shells out to `uv run python segmentation/infer.py` there (needs `uv` on PATH, GPU). Default weights `models/ilu-seg-yolov8m-1024.pt` (TRUDI v2, classes `container`/`tank_container`/`trailer`); overrides via stage cfg `weights` / `imgsz` / `conf` / `max_det` / `device`. Writes the `instances` artifact (`schemas/vision.py:Instances`); not yet consumed by `associate`/`fuse`.
 - OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the TRUDI id_text fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_200e_trudi`), default rec is RobustScanner fine-tuned on TRUDI id_text crops (`robustscanner_resnet31_20e_trudi`); config/weights paths resolve relative to the mmocr repo root, override with stage cfg `det` / `det_weights` / `rec` / `rec_weights`. Runner imports mmocr inside the backend venv.
-- Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_instanceseg.py`, `uv run python tools/smoke_mmocr.py`.
-- `configs/pipeline_backends.yaml` runs pose + instanceseg + mmocr on the synthetic drone scene; `configs/pipeline_pose.yaml` stays pose+mmocr only.
+- Identification: `../ilu-identification` — stage runs `tools/identify_runner.py` (lives in **this** repo) in a **child process** via `sys.executable` (the identification lib needs only pydantic+numpy, already present). **Never import the identification package in-process**: both repos expose top-level `schemas/` and `core/` packages, which would collide. The runner does `sys.path.insert(0, backend_dir)` in its own interpreter. Override with stage cfg `python` / `runner` / `backend_dir`. Writes `schemas/identification.py:IdentifiedILUs`; `fuse` consumes it via the optional `ilu_ids` input.
+- Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_instanceseg.py`, `uv run python tools/smoke_mmocr.py`, `uv run python tools/smoke_identify.py`.
+- `configs/pipeline_backends.yaml` runs pose + instanceseg + mmocr on the synthetic drone scene; `configs/pipeline_pose.yaml` stays pose+mmocr only. Both include the identify stage after `associate`.
 
 ## Testing
 
 - Unit + fixture e2e always run. Backend integration tests are `@pytest.mark.skipif(RUN_BACKEND_TESTS != "1")`.
-- Golden test: `tests/test_dag_e2e.py::test_fixture_pipeline_matches_golden` compares full `fuse` output to `tests/golden/ilu_records.json`. Regenerate deliberately when fusion behavior changes (run fixture pipeline, copy `fuse/ilu_records.json` over the golden file).
+- Golden test: `tests/test_dag_e2e.py::test_fixture_pipeline_matches_golden` compares full `fuse` output to `tests/golden/ilu_records.json`. Regenerate deliberately when fusion behavior changes (run fixture pipeline with `--no-cache`, copy `fuse/ilu_records.json` over the golden file, and re-copy to `docs/data/fixture-records.json`).
 - Visualization tests (`tests/test_visualization.py`) assert structure only (files written, table contents, no overlapping labels via placement helpers) — no golden images.
-- Builders in `tests/builders.py` (`make_spot`, `make_box`, …) for vision models; fixtures under `tests/fixtures/`.
+- Builders in `tests/builders.py` (`make_spot`, `make_box`, `make_identified`, …) for vision and identification models; fixtures under `tests/fixtures/`.
+- The identify stage unit tests (`tests/test_identify_stage.py`) need the sibling `../ilu-identification` checkout for the end-to-end case (skipped if absent); translation tests are pure.

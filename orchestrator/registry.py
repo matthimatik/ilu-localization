@@ -7,6 +7,7 @@ from orchestrator.stages.fixture import (
     FixtureTextSpotsStage,
 )
 from orchestrator.stages.fuse import FuseStage
+from orchestrator.stages.identify import IdentifyStage
 from orchestrator.stages.instanceseg import InstancesegBackendStage
 from orchestrator.stages.load_image import LoadImageStage
 from orchestrator.stages.mmocr_backend import MmocrBackendStage
@@ -21,6 +22,7 @@ _REGISTRY: dict[str, type] = {
     "mmocr": MmocrBackendStage,
     "instanceseg": InstancesegBackendStage,
     "associate": AssociateStage,
+    "identify": IdentifyStage,
     "fuse": FuseStage,
 }
 

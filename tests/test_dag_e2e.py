@@ -24,6 +24,7 @@ def test_fixture_pipeline_end_to_end(tmp_path):
         "poseboxes",
         "embeddings",
         "associate",
+        "identify",
         "fuse",
     ]
 
@@ -33,9 +34,11 @@ def test_fixture_pipeline_end_to_end(tmp_path):
 
     box_a = by_id["box-A"]
     assert box_a.iso_code == "BMOU2372713"
+    assert box_a.id_scheme == "iso6346"
     assert box_a.identification_method.value == "code"
     assert box_a.category == "container"
     assert box_a.size_class == "40"
+    assert box_a.size_type == "45G1"
 
     box_b = by_id["box-B"]
     assert box_b.iso_code is None

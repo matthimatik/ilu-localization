@@ -38,6 +38,14 @@ stages:
       embeddings: embeddings/embeddings
     cfg:
       margin_px: 0.0
+  - name: identify
+    impl: identify
+    inputs:
+      associations: associate/associations
+      text_spots: textspots/text_spots
+      pose_boxes: poseboxes/pose_boxes
+    cfg:
+      backend_dir: ../ilu-identification
   - name: fuse
     impl: fuse
     inputs:
@@ -46,3 +54,4 @@ stages:
       pose_boxes: poseboxes/pose_boxes
       embeddings: embeddings/embeddings
       image_ref: load_image/image_ref
+      ilu_ids: identify/ilu_ids

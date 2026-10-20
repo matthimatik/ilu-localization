@@ -6,7 +6,9 @@
       "ilu_id": "box-A",
       "category": "container",
       "iso_code": "BMOU2372713",
+      "id_scheme": "iso6346",
       "size_class": "40",
+      "size_type": "45G1",
       "identification_method": "code",
       "pose": {
         "box_id": "box-A",
@@ -80,7 +82,7 @@
       "embedding_crop_id": null,
       "confidences": {
         "pose": 0.91,
-        "ocr": 0.94,
+        "ocr": 1.0,
         "text_match": 0.94
       }
     },
@@ -88,7 +90,9 @@
       "ilu_id": "box-B",
       "category": "trailer",
       "iso_code": null,
+      "id_scheme": null,
       "size_class": "trailer",
+      "size_type": null,
       "identification_method": "embedding_rank",
       "pose": {
         "box_id": "box-B",

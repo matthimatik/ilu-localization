@@ -10,6 +10,7 @@ from schemas.vision import (
 )
 from schemas.ilu import IdentificationMethod, ILURecord, ILURecords
 from schemas.association import Association, Associations
+from schemas.identification import IdentifiedILU, IdentifiedILUs, IdSizeType
 from schemas.run import RunManifest, StageResult, StageStatus
 
 __all__ = [
@@ -29,6 +30,9 @@ __all__ = [
     "ILURecords",
     "Association",
     "Associations",
+    "IdentifiedILU",
+    "IdentifiedILUs",
+    "IdSizeType",
     "RunManifest",
     "StageResult",
     "StageStatus",

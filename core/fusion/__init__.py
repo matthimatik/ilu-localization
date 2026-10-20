@@ -1,4 +1,4 @@
 from core.fusion.iso6346 import validate_iso6346
-from core.fusion.api import fuse
+from core.fusion.api import category_for, fuse
 
-__all__ = ["fuse", "validate_iso6346"]
+__all__ = ["fuse", "validate_iso6346", "category_for"]

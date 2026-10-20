@@ -10,7 +10,7 @@ from orchestrator.stages.pose import match_pnp
 from schemas.association import Associations
 from schemas.ilu import ILURecords
 from schemas.image import ImageRef
-from schemas.vision import TextSpots
+from schemas.vision import Instances, TextSpots
 
 
 @dataclass
@@ -20,6 +20,7 @@ class RunArtifacts:
     image_path: Path
     text_spots: TextSpots | None = None
     associations: Associations | None = None
+    instances: Instances | None = None
     world_by_id: dict[str, np.ndarray] = field(default_factory=dict)
     camera: dict | None = None
 
@@ -35,7 +36,8 @@ def load_run(run_dir: Path | str, base_dir: Path | str) -> RunArtifacts:
 
     World corners for the 3D scene come from the pose backend's raw output
     (`pose/raw/<stem>/detections.json` + `boxes.json`), which only exists for
-    pose-backend runs; fixture runs load without them.
+    pose-backend runs; fixture runs load without them. Instance-segmentation
+    masks (`instanceseg/instances.json`) are likewise optional.
     """
     run_dir = Path(run_dir)
     base_dir = Path(base_dir)
@@ -65,6 +67,7 @@ def load_run(run_dir: Path | str, base_dir: Path | str) -> RunArtifacts:
         associations=_read_model(
             run_dir / "associate" / "associations.json", Associations
         ),
+        instances=_read_model(run_dir / "instanceseg" / "instances.json", Instances),
         world_by_id=world_by_id,
         camera=camera,
     )

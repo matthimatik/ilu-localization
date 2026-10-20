@@ -3,10 +3,10 @@
 Drawing idioms follow ../ilu-pose-estimation/keypoints/evaluate_pose.py:
 resolution-scaled strokes, outlined text, a black title bar.
 
-The image area carries only geometric annotations: instance-tinted 8-corner
-wireframes with keypoints, OCR quad outlines and small id badges. All record
-metadata lives in the table strip appended below the image (and in the HTML
-report), keyed by the badge id.
+The image area carries only geometric annotations: instance-segmentation mask
+outlines, instance-tinted 8-corner wireframes with keypoints, OCR quad
+outlines and small id badges. All record metadata lives in the table strip
+appended below the image (and in the HTML report), keyed by the badge id.
 """
 
 from typing import NamedTuple
@@ -17,7 +17,7 @@ import numpy as np
 from core.association.api import visible_bbox
 from schemas.association import Associations
 from schemas.ilu import IdentificationMethod, ILURecord, ILURecords
-from schemas.vision import TextSpot, TextSpots
+from schemas.vision import Instances, TextSpot, TextSpots
 
 # Box edges between corners (0-based), same order as the pose backend.
 SKELETON = [
@@ -44,6 +44,11 @@ TABLE_ROW_ALT_BG = (40, 40, 40)
 # Tint alpha for the instance-colour fill of each box footprint.
 INSTANCE_FILL_ALPHA = 0.35
 SPOT_FILL_ALPHA = 0.30
+# BGR. One uniform tint for the instance-segmentation mask layer, kept away
+# from the instance palette so masks read as their own plane under the
+# keyed wireframes/badges.
+SEG_MASK_COLOR = (170, 230, 170)
+SEG_MASK_ALPHA = 0.22
 
 
 def stroke(img: np.ndarray) -> tuple[int, float, int]:
@@ -249,6 +254,37 @@ def _tint_fill(im: np.ndarray, pts: np.ndarray, color, alpha: float) -> None:
     base = im[region].astype(np.float32)
     tint = np.asarray(color, dtype=np.float32)
     im[region] = (base * (1.0 - alpha) + tint * alpha).astype(np.uint8)
+
+
+def draw_seg_masks(
+    im: np.ndarray,
+    instances: Instances | None,
+) -> np.ndarray:
+    """Translucent instance-segmentation masks (polygon fill + thin outline).
+
+    One uniform tint for the whole layer so masks stay visually distinct from
+    the record-keyed wireframe/badge colours; no per-mask text on the image.
+    """
+    if instances is None or not instances.instances:
+        return im
+    lw, _, _ = stroke(im)
+    thickness = max(1, lw - 1)
+    tint = np.asarray(SEG_MASK_COLOR, dtype=np.float32)
+    out = im.copy()
+    for instance in instances.instances:
+        poly = np.asarray(instance.polygon_px, dtype=np.float32)
+        if len(poly) < 3:
+            continue
+        contour = poly.astype(np.int32).reshape(-1, 1, 2)
+        mask = np.zeros(out.shape[:2], np.uint8)
+        cv2.fillPoly(mask, [contour], 255)
+        region = mask > 0
+        base = out[region].astype(np.float32)
+        out[region] = (base * (1.0 - SEG_MASK_ALPHA) + tint * SEG_MASK_ALPHA).astype(
+            np.uint8
+        )
+        cv2.polylines(out, [contour], True, SEG_MASK_COLOR, thickness, cv2.LINE_AA)
+    return out
 
 
 def draw_instances(
@@ -524,6 +560,7 @@ def build_record_table(
     text_spots: TextSpots | None = None,
     associations: Associations | None = None,
     lw: int = 2,
+    has_masks: bool = False,
 ) -> np.ndarray:
     """Detail table strip appended below the overlay image.
 
@@ -540,6 +577,8 @@ def build_record_table(
         "id ↔ badge on the image · colour swatch = instance · "
         "OCR texts = associated spots (text confidence) · box = pose method (pnp/yolo)"
     )
+    if has_masks:
+        note += " · mint fill/outline = instance-segmentation mask"
     fs = u * 0.75 / 22
     tf = max(1, round(u / 10))
 
@@ -651,17 +690,21 @@ def build_overlay(
     records: ILURecords,
     text_spots: TextSpots | None = None,
     associations: Associations | None = None,
+    instances: Instances | None = None,
     title: str | None = None,
     label_mode: str = "ids",
     spot_mode: str = "associated",
 ) -> np.ndarray:
     """End-result overlay: annotated image + detail table strip below.
 
-    The image area stays annotation-only (instances, keypoints, OCR quads, id
-    badges); every metadata field is in the table keyed by badge id.
+    The image area stays annotation-only (masks, instances, keypoints, OCR
+    quads, id badges); every metadata field is in the table keyed by badge id.
     """
     if title is None:
         title = f"ILU localization · {records.image_path} · {_summary(records.records)}"
+    has_masks = instances is not None and bool(instances.instances)
+    if has_masks:
+        title = f"{title} · {len(instances.instances)} seg"
     color_by_index: dict[int, tuple[int, int, int]] = {}
     if associations is not None:
         index_by_id = {r.ilu_id: i for i, r in enumerate(records.records)}
@@ -679,11 +722,13 @@ def build_overlay(
         text_spots, color_by_index, spot_mode, lw, img_w, img_h
     )
     out = draw_instances(image, records.records)
+    out = draw_seg_masks(out, instances)
     out = draw_text_spots(out, text_spots, color_by_index, mode=spot_mode)
     out = draw_labels(
         out, records.records, title, label_mode=label_mode, obstacles=obstacles
     )
     table = build_record_table(
-        out.shape[1], records.records, text_spots, associations, lw
+        out.shape[1], records.records, text_spots, associations, lw,
+        has_masks=has_masks,
     )
     return np.vstack([out, table])

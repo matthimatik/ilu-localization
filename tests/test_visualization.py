@@ -19,6 +19,7 @@ from core.visualization.draw import (
     FONT,
     _overlaps,
     _wrap_items,
+    draw_seg_masks,
     plan_labels,
     record_label_items,
     record_table_cells,
@@ -30,7 +31,7 @@ from orchestrator.config import build_pipeline
 from orchestrator.store import ArtifactStore
 from schemas.association import Association, Associations
 from schemas.ilu import IdentificationMethod, ILURecord, ILURecords
-from schemas.vision import TextSpots
+from schemas.vision import Instance, Instances, TextSpots
 from tests.builders import make_box, make_spot
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +65,68 @@ def test_overlay_adds_annotation_and_table(fixture_run):
     assert (overlay[: image.shape[0]] != image).any()
     # table strip starts with its header band (row background follows below)
     assert (overlay[image.shape[0]] == 48).all()
+
+
+def test_draw_seg_masks_tints_inside_only():
+    # synthetic triangle: interior pixels blend toward the mask colour, a far
+    # pixel outside the polygon stays untouched
+    image = np.zeros((100, 100, 3), np.uint8)
+    instances = Instances(
+        image_path="img.png",
+        instances=[
+            Instance(
+                instance_id="seg-0",
+                label="container",
+                confidence=0.9,
+                bbox_px=(10.0, 10.0, 60.0, 60.0),
+                polygon_px=[(10.0, 10.0), (60.0, 10.0), (35.0, 60.0)],
+            )
+        ],
+    )
+
+    out = draw_seg_masks(image, instances)
+
+    assert (out[30, 35] != image[30, 35]).any()  # interior changed
+    assert (out[90, 90] == image[90, 90]).all()  # outside unchanged
+
+
+def test_draw_seg_masks_none_and_empty_are_noops():
+    image = np.zeros((50, 50, 3), np.uint8)
+
+    assert draw_seg_masks(image, None) is image
+    empty = Instances(image_path="img.png", instances=[])
+    assert draw_seg_masks(image, empty) is image
+
+
+def test_overlay_with_instances_draws_masks_and_title(fixture_run):
+    artifacts = load_run(fixture_run, base_dir=REPO_ROOT)
+    image = cv2.imread(str(artifacts.image_path))
+    instances = Instances(
+        image_path=artifacts.records.image_path,
+        instances=[
+            Instance(
+                instance_id="seg-0",
+                label="container",
+                confidence=0.9,
+                bbox_px=(10.0, 10.0, 60.0, 60.0),
+                polygon_px=[(10.0, 10.0), (60.0, 10.0), (35.0, 60.0)],
+            )
+        ],
+    )
+
+    overlay = build_overlay(
+        image,
+        artifacts.records,
+        text_spots=artifacts.text_spots,
+        associations=artifacts.associations,
+        instances=instances,
+        title="with masks",
+    )
+
+    assert overlay.shape[1] == image.shape[1]
+    assert overlay.shape[0] > image.shape[0]
+    # the mask polygon region is tinted even where no record wireframe sits
+    assert (overlay[30, 35] != image[30, 35]).any()
 
 
 def test_labels_default_to_id_badges():
@@ -315,6 +378,37 @@ def test_label_placement_never_overlaps():
     for i, rect in enumerate(rects):
         for other in rects[i + 1 :]:
             assert not _overlaps(rect, [other])
+
+
+def test_load_run_reads_instances_artifact(fixture_run):
+    # fixture pipeline has no instanceseg stage: absent artifact loads as None
+    artifacts = load_run(fixture_run, base_dir=REPO_ROOT)
+    assert artifacts.instances is None
+
+    # drop a minimal instances.json where load_run looks for it
+    seg_dir = fixture_run / "instanceseg"
+    seg_dir.mkdir(parents=True, exist_ok=True)
+    (seg_dir / "instances.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "image_path": str(artifacts.image_path),
+                "instances": [
+                    {
+                        "instance_id": "seg-0",
+                        "label": "container",
+                        "confidence": 0.9,
+                        "bbox_px": [10.0, 10.0, 60.0, 60.0],
+                        "polygon_px": [[10.0, 10.0], [60.0, 10.0], [35.0, 60.0]],
+                    }
+                ],
+            }
+        )
+    )
+    reloaded = load_run(fixture_run, base_dir=REPO_ROOT)
+    assert reloaded.instances is not None
+    assert len(reloaded.instances.instances) == 1
+    assert reloaded.instances.instances[0].label == "container"
 
 
 def test_find_latest_run_picks_newest_successful(tmp_path):

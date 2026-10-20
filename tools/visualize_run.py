@@ -2,8 +2,8 @@
 """Visualize the end result of a completed pipeline run.
 
 Writes into <run>/viz/ (override with --out):
-    overlay.jpg   annotated image (instances, keypoints, OCR quads, id badges)
-                  + full detail table below, keyed by badge id
+    overlay.jpg   annotated image (masks, instances, keypoints, OCR quads,
+                  id badges) + full detail table below, keyed by badge id
     scene.html    interactive 3D world scene incl. text spots, when available
     report.html   summary counts, record table, inlined overlay, scene link
 
@@ -54,6 +54,12 @@ def main() -> int:
         default="associated",
         help="OCR quads: associated only (default), all, or none",
     )
+    parser.add_argument(
+        "--seg",
+        choices=["on", "none"],
+        default="on",
+        help="instance-segmentation mask layer: on (default) or none",
+    )
     parser.add_argument("--no-scene", action="store_true")
     parser.add_argument("--no-report", action="store_true")
     parser.add_argument("--open", action="store_true", help="open report.html in a browser")
@@ -77,6 +83,7 @@ def main() -> int:
         artifacts.records,
         text_spots=artifacts.text_spots,
         associations=artifacts.associations,
+        instances=artifacts.instances if args.seg != "none" else None,
         title=title,
         label_mode=args.labels,
         spot_mode=args.spots,

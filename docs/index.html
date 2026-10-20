@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ILU Localization — identify &amp; geolocate containers from drone imagery</title>
+<meta name="description" content="DAG-orchestrated vision pipeline that detects, identifies (ISO 6346) and localizes intermodal containers and trailers in drone images." />
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#">ilu-localization</a>
+    <div class="links">
+      <a href="#results">Results</a>
+      <a href="#how">How it works</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="https://github.com/matthimatik/ilu-localization">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Find, identify and geolocate<br /><span class="accent">intermodal logistics units</span> in drone images</h1>
+    <p class="lead">
+      A DAG-orchestrated vision pipeline: corner-keypoint pose estimation, instance segmentation and
+      TRUDI-fine-tuned OCR run as independent stages over JSON artifacts, then get associated and fused into
+      validated ISO&nbsp;6346 records with real-world 6D poses.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#results">See results</a>
+      <a class="btn" href="https://github.com/matthimatik/ilu-localization">View source</a>
+      <a class="btn" href="https://github.com/matthimatik/ilu-localization/blob/master/AGENTS.md">Docs (AGENTS.md)</a>
+    </div>
+    <div class="stats">
+      <div><b>3</b><span>vision backends</span></div>
+      <div><b>6–7</b><span>DAG stages</span></div>
+      <div><b>ISO 6346</b><span>check-digit validation</span></div>
+      <div><b>8 corners</b><span>6D pose per unit</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ==================== RESULTS ==================== -->
+<section id="results">
+  <div class="wrap">
+    <h2>Results</h2>
+    <p class="sub">
+      Every image below is the run overlay: instance-tinted 8-corner wireframes, OCR quads, id badges and a
+      detail table strip. <em>Input → output</em> first, then the fused records.
+    </p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-panel="p-backends">full backends · synthetic scene</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="p-photo">pose + OCR · real photo</button>
+      <button class="tab" role="tab" aria-selected="false" data-panel="p-fixture">fixture e2e · GPU-free</button>
+    </div>
+
+    <!-- panel: backends -->
+    <div class="panel active" id="p-backends" role="tabpanel">
+      <div class="inputs">
+        <figure class="shot">
+          <img src="assets/img/backends-input.jpg" alt="Input: synthetic drone scene over a container terminal" loading="lazy" />
+          <figcaption>input · synthetic drone render (3840×2160)</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/img/backends-overlay.jpg" alt="Output overlay: 20 container records with corner wireframes, OCR quads and detail table" loading="lazy" />
+          <figcaption>output · pose + instance seg + MMOCR fused</figcaption>
+        </figure>
+      </div>
+      <div class="run-grid">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>id</th><th>category</th><th>size</th><th>ISO 6346</th><th>ident</th><th>pose</th><th>OCR texts (assoc.)</th></tr></thead>
+            <tbody>
+              <tr><td>det-1</td><td>container</td><td>40</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.97</td><td>KUB63390480 0.56</td></tr>
+              <tr><td>det-2</td><td>container</td><td>20</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.97</td><td>KAVU9192350 0.64</td></tr>
+              <tr><td>det-4</td><td>container</td><td>20</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.97</td><td>22G1 0.76, PLU00000572 0.73</td></tr>
+              <tr><td>det-5</td><td>container</td><td>20</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.96</td><td>CVOU814235 0.76, 22G1 0.65</td></tr>
+              <tr><td>det-6</td><td>container</td><td>20</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.96</td><td>KLIU8187561 0.73, 22G1 0.71</td></tr>
+              <tr><td>det-11</td><td>container</td><td>40</td><td class="no">—</td><td class="no">unknown</td><td>pnp 0.95</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="side">
+          <h3>Run 20261018-081350</h3>
+          <div class="chips">
+            <span class="chip">pose (PnP)</span>
+            <span class="chip">instanceseg</span>
+            <span class="chip">MMOCR</span>
+            <span class="chip hot">22 instances</span>
+            <span class="chip">20 records</span>
+          </div>
+          <p>
+            Full backend stack on a synthetic drone render. Pose is solved by PnP against known camera
+            intrinsics (conf 0.76–0.97); 12×&nbsp;20&nbsp;ft, 4×&nbsp;40&nbsp;ft, 4 unknown size.
+            OCR associates codes to boxes, but every candidate currently <strong>fails ISO 6346 check-digit
+            validation</strong> — those records stay <code>ident: unknown</code> instead of guessing.
+          </p>
+          <a class="btn" href="demos/backends-scene.html" target="_blank" rel="noopener">open 3D scene ↗</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- panel: real photo -->
+    <div class="panel" id="p-photo" role="tabpanel">
+      <div class="inputs">
+        <figure class="shot">
+          <img src="assets/img/real-photo-input.jpg" alt="Input: real drone photograph of a stacked container yard" loading="lazy" />
+          <figcaption>input · real drone photo (20250102_121248)</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/img/real-photo-overlay.jpg" alt="Output overlay: 15 detected containers, two identified with validated ISO codes" loading="lazy" />
+          <figcaption>output · pose + MMOCR (TRUDI models) fused</figcaption>
+        </figure>
+      </div>
+      <div class="run-grid">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>id</th><th>category</th><th>ISO 6346</th><th>ident</th><th>pose</th><th>OCR texts (assoc.)</th></tr></thead>
+            <tbody>
+              <tr><td>det-3</td><td>container</td><td class="ok">RRMU2106460</td><td class="ok">code</td><td>yolo 0.96</td><td>RRMU2106460 0.79, 22G 0.41</td></tr>
+              <tr><td>det-12</td><td>container</td><td class="ok">GESU6417450</td><td class="ok">code</td><td>yolo 0.82</td><td>GESU6417450 0.79, 45G1 0.62</td></tr>
+              <tr><td>det-2</td><td>container</td><td class="no">—</td><td class="no">unknown</td><td>yolo 0.96</td><td>BMOU483393 0.76, 45G1 0.74</td></tr>
+              <tr><td>det-4</td><td>container</td><td class="no">—</td><td class="no">unknown</td><td>yolo 0.96</td><td>RRMU259687 0.47</td></tr>
+              <tr><td>det-7</td><td>container</td><td class="no">—</td><td class="no">unknown</td><td>yolo 0.89</td><td>CARU5808616 0.41</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="side">
+          <h3>Run 20261018-002257</h3>
+          <div class="chips">
+            <span class="chip">pose (YOLO corners)</span>
+            <span class="chip">MMOCR · TRUDI</span>
+            <span class="chip hot">15 records</span>
+            <span class="chip warn">2 identified</span>
+          </div>
+          <p>
+            Unedited terminal photograph with real occlusion, glare and weathering. Two codes survive
+            check-digit validation (<code>RRMU2106460</code>, <code>GESU6417450</code>); three more OCR
+            candidates are read but rejected by validation — honest failures, not silent ones.
+            No camera calibration for this frame, so corners stay in image space (no 3D scene).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- panel: fixture -->
+    <div class="panel" id="p-fixture" role="tabpanel">
+      <div class="inputs">
+        <figure class="shot">
+          <img src="assets/img/fixture-input.png" alt="Input: synthetic fixture scene with a container and a trailer" loading="lazy" />
+          <figcaption>input · tests/fixtures/image.png (committed fixture)</figcaption>
+        </figure>
+        <figure class="shot">
+          <img src="assets/img/fixture-overlay.jpg" alt="Output overlay: container identified by ISO code, trailer by embedding rank" loading="lazy" />
+          <figcaption>output · fixture stages, no GPU needed</figcaption>
+        </figure>
+      </div>
+      <div class="run-grid">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>id</th><th>category</th><th>size</th><th>ISO 6346</th><th>ident</th><th>pose</th><th>OCR (assoc.)</th></tr></thead>
+            <tbody>
+              <tr><td>box-A</td><td>container</td><td>40</td><td class="ok">BMOU2372713</td><td class="ok">code</td><td>pnp 0.91</td><td>BMOU2372713 0.94, 45G1 0.87</td></tr>
+              <tr><td>box-B</td><td>trailer</td><td>trailer</td><td class="no">—</td><td class="ok">embedding_rank</td><td>pnp 0.88</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="side">
+          <h3>Run 20261017-161314</h3>
+          <div class="chips">
+            <span class="chip">fixture stages</span>
+            <span class="chip">2 records</span>
+            <span class="chip hot">ident: code</span>
+            <span class="chip hot">ident: embedding_rank</span>
+          </div>
+          <p>
+            The GPU-free end-to-end path used by <code>uv run pytest</code>: pre-baked text spots, pose boxes
+            and embeddings flow through the real <code>associate → fuse</code> logic and match the golden file
+            byte-for-byte. Shows both identification methods and a <strong>trailer</strong> category.
+          </p>
+          <a class="btn" href="demos/fixture-scene.html" target="_blank" rel="noopener">open 3D scene ↗</a>
+          <a class="btn" href="data/fixture-records.json" target="_blank" rel="noopener">golden records ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== HOW IT WORKS ==================== -->
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">
+      Conceptual system view (redrawn from the project's draw.io diagram), then the concrete pipeline DAG
+      that implements it.
+    </p>
+
+    <div class="diagram">
+      <pre class="mermaid">
+flowchart TD
+    IMG["Image"] --> TXT["Text detection<br/>&amp; recognition"]
+    IMG --> SEG["Instance segmentation"]
+    IMG --> KP["Keypoint detection"]
+    KP --> POSE["Estimate 6D pose<br/>relative to camera"]
+    CAM["Drone metadata<br/>· camera properties"] -.-> POSE
+    POSE --> MAP["Map to 6D pose<br/>in real world"]
+    GPS["Drone metadata<br/>· GPS position"] -.-> MAP
+    TXT --> ID["Identify ILU<br/>(ISO 6346)"]
+    TXT --> CAT["Categorize ILU"]
+    SEG --> ID
+    SEG --> CAT
+    CAT --> POSE
+    ID --> OUT["Identified &amp; categorized ILU<br/>with GPS coordinates"]
+    MAP --> OUT
+      </pre>
+      <div class="caption">high-level system diagram · source: High Level System Diagram for ILU Localization.drawio</div>
+    </div>
+
+    <div class="diagram">
+      <div class="pipeline">
+        <div class="pstage"><b>load_image</b><span>validate image + camera</span></div>
+        <div class="parrow"><span class="art">ImageRef</span><span class="glyph">→</span></div>
+        <div class="pgroup">
+          <div class="pstage parallel"><b>pose</b><span>corners → PoseBoxes</span></div>
+          <div class="pstage parallel"><b>instanceseg</b><span>masks → Instances</span></div>
+          <div class="pstage parallel"><b>textspots</b><span>OCR → TextSpots</span></div>
+        </div>
+        <div class="parrow"><span class="art">PoseBoxes · TextSpots · Instances</span><span class="glyph">→</span></div>
+        <div class="pstage"><b>associate</b><span>quads inside boxes → Associations</span></div>
+        <div class="parrow"><span class="art">Associations</span><span class="glyph">→</span></div>
+        <div class="pstage"><b>fuse</b><span>ISO 6346 + pose + embeddings</span></div>
+        <div class="parrow"><span class="art">ILURecords</span><span class="glyph">→</span></div>
+        <div class="pstage"><b>visualize</b><span>overlay · 3D scene · report</span></div>
+      </div>
+      <div class="caption">
+        stages run independently (parallel group highlighted) and only exchange JSON artifacts via the ArtifactStore ·
+        visualization is a post-run tool, not a stage
+      </div>
+    </div>
+
+    <div class="cards" style="margin-top:18px">
+      <div class="card">
+        <h3>associate</h3>
+        <p>Links each pose box to OCR quads whose centres fall inside its visible corner bbox (configurable
+        <code>margin_px</code>) — no global tracking, just geometric association per frame.</p>
+      </div>
+      <div class="card">
+        <h3>fuse</h3>
+        <p>Validates ISO 6346 owner codes and check digits, picks category (container / trailer), size class
+        and the identification method: <code>code</code> &gt; <code>embedding_rank</code> &gt;
+        <code>unknown</code>.</p>
+      </div>
+      <div class="card">
+        <h3>schema-first</h3>
+        <p>Pydantic models (<code>ImageRef</code>, <code>PoseBoxes</code>, <code>TextSpots</code>,
+        <code>Associations</code>, <code>ILURecords</code>) versioned with <code>schema_version</code> —
+        the contract between all stages.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== ARCHITECTURE ==================== -->
+<section id="architecture">
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <p class="sub">A library + CLI tools, not a service. Everything is a stage registered in one dictionary.</p>
+
+    <div class="cards">
+      <div class="card">
+        <h3>JSON-artifact DAG</h3>
+        <p>Stages only talk through <code>runs/&lt;run_id&gt;/&lt;stage&gt;/&lt;name&gt;.json</code>.
+        Config <code>inputs</code> reference <code>"stage/artifact"</code>; a missing artifact fails the stage
+        and aborts the run. The manifest is rewritten after every stage.</p>
+      </div>
+      <div class="card">
+        <h3>Content-addressed cache</h3>
+        <p>Stage outputs are keyed on class + config JSON + input file hashes in <code>.cache/stages</code>.
+        Re-running an unchanged pipeline replays from cache; <code>--no-cache</code> forces execution.</p>
+      </div>
+      <div class="card">
+        <h3>External backends</h3>
+        <p>Sibling repos, not vendored: <code>../ilu-pose-estimation</code> (YOLOv8 corners + PnP),
+        <code>../ilu-detection</code> (TRUDI instance segmentation), <code>../mmocr</code>
+        (DBNet++ det + RobustScanner rec, fine-tuned on TRUDI id text).</p>
+      </div>
+      <div class="card">
+        <h3>Golden-file testing</h3>
+        <p>Unit + fixture e2e always run in CI-less <code>pytest</code>; backend integration tests are
+        opt-in via <code>RUN_BACKEND_TESTS=1</code>. Fusion output is diffed against
+        <code>tests/golden/ilu_records.json</code>.</p>
+      </div>
+      <div class="card">
+        <h3>Post-run visualization</h3>
+        <p><code>tools/visualize_run.py</code> renders a completed run: cv2 2D overlay (wireframes, OCR quads,
+        id badges, detail strip), a plotly 3D world scene with camera frustum, and a self-contained HTML
+        report.</p>
+      </div>
+      <div class="card">
+        <h3>Config-driven</h3>
+        <p>Pipelines are YAML (<code>configs/pipeline*.yaml</code>) mapping string <code>impl</code> keys to
+        registered stage classes. Relative paths resolve against the config's base dir.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== QUICKSTART ==================== -->
+<section id="quickstart">
+  <div class="wrap">
+    <h2>Quickstart</h2>
+    <p class="sub">Python ≥ 3.11, managed with <code>uv</code>. The fixture pipeline needs no GPU.</p>
+
+    <div class="two-col">
+      <pre class="snippet"><span class="c"># install (dev group: pytest)</span>
+<span class="p">uv</span> sync
+
+<span class="c"># all tests, incl. fixture end-to-end</span>
+<span class="p">uv</span> run pytest
+
+<span class="c"># fixture pipeline (no GPU)</span>
+<span class="p">uv</span> run python tools/run_pipeline.py
+
+<span class="c"># real backends (GPU + sibling repos)</span>
+<span class="p">uv</span> run python tools/run_pipeline.py <span class="p">\</span>
+    --config configs/pipeline_backends.yaml
+
+<span class="c"># render overlay + 3D scene + report</span>
+<span class="p">uv</span> run python tools/visualize_run.py</pre>
+
+      <div>
+        <p style="margin-top:0;color:var(--muted);font-size:14px">
+          The fixture pipeline ends in records like this — one container identified by validated ISO 6346
+          code, one trailer ranked by embedding similarity:
+        </p>
+        <pre class="json">{
+  <span class="k">"schema_version"</span>: <span class="s">"1"</span>,
+  <span class="k">"image_path"</span>: <span class="s">"tests/fixtures/image.png"</span>,
+  <span class="k">"records"</span>: [
+    {
+      <span class="k">"ilu_id"</span>: <span class="s">"box-A"</span>,
+      <span class="k">"category"</span>: <span class="s">"container"</span>,
+      <span class="k">"iso_code"</span>: <span class="s">"BMOU2372713"</span>,
+      <span class="k">"size_class"</span>: <span class="s">"40"</span>,
+      <span class="k">"identification_method"</span>: <span class="s">"code"</span>,
+      <span class="k">"pose"</span>: { <span class="k">"corners_px"</span>: <span class="n">[ 8 corners ]</span> }
+    },
+    {
+      <span class="k">"ilu_id"</span>: <span class="s">"box-B"</span>,
+      <span class="k">"category"</span>: <span class="s">"trailer"</span>,
+      <span class="k">"identification_method"</span>: <span class="s">"embedding_rank"</span>
+    }
+  ]
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>ilu-localization · <a href="https://github.com/matthimatik/ilu-localization">github.com/matthimatik/ilu-localization</a></span>
+    <span class="mono">showcase assets snapshotted from run outputs — see docs/README.md</span>
+  </div>
+</footer>
+
+<script type="module">
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => tab.addEventListener('click', () => {
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    document.querySelectorAll('.panel').forEach(p =>
+      p.classList.toggle('active', p.id === tab.dataset.panel));
+  }));
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      background: '#151b23',
+      primaryColor: '#151b23',
+      primaryTextColor: '#dce4ee',
+      primaryBorderColor: '#232c37',
+      lineColor: '#22d3ee',
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
+      fontSize: '13px'
+    },
+    flowchart: { curve: 'basis', padding: 12 }
+  });
+</script>
+</body>
+</html>

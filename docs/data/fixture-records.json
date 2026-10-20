@@ -1,0 +1,167 @@
+{
+  "schema_version": "1",
+  "image_path": "tests/fixtures/image.png",
+  "records": [
+    {
+      "ilu_id": "box-A",
+      "category": "container",
+      "iso_code": "BMOU2372713",
+      "size_class": "40",
+      "identification_method": "code",
+      "pose": {
+        "box_id": "box-A",
+        "corners_px": [
+          {
+            "position_px": [
+              1400.0,
+              850.0
+            ],
+            "confidence": 0.93
+          },
+          {
+            "position_px": [
+              1900.0,
+              855.0
+            ],
+            "confidence": 0.91
+          },
+          {
+            "position_px": [
+              1905.0,
+              1000.0
+            ],
+            "confidence": 0.89
+          },
+          {
+            "position_px": [
+              1395.0,
+              995.0
+            ],
+            "confidence": 0.92
+          },
+          {
+            "position_px": [
+              1402.0,
+              1100.0
+            ],
+            "confidence": 0.78
+          },
+          {
+            "position_px": [
+              1898.0,
+              1105.0
+            ],
+            "confidence": 0.76
+          },
+          {
+            "position_px": [
+              1902.0,
+              1150.0
+            ],
+            "confidence": 0.74
+          },
+          {
+            "position_px": [
+              1398.0,
+              1148.0
+            ],
+            "confidence": 0.77
+          }
+        ],
+        "size_class": "40",
+        "center_m": [
+          12.5,
+          3.1,
+          8.0
+        ],
+        "method": "pnp",
+        "confidence": 0.91
+      },
+      "embedding_crop_id": null,
+      "confidences": {
+        "pose": 0.91,
+        "ocr": 0.94,
+        "text_match": 0.94
+      }
+    },
+    {
+      "ilu_id": "box-B",
+      "category": "trailer",
+      "iso_code": null,
+      "size_class": "trailer",
+      "identification_method": "embedding_rank",
+      "pose": {
+        "box_id": "box-B",
+        "corners_px": [
+          {
+            "position_px": [
+              2200.0,
+              900.0
+            ],
+            "confidence": 0.85
+          },
+          {
+            "position_px": [
+              2700.0,
+              905.0
+            ],
+            "confidence": 0.84
+          },
+          {
+            "position_px": [
+              2705.0,
+              1080.0
+            ],
+            "confidence": 0.82
+          },
+          {
+            "position_px": [
+              2195.0,
+              1075.0
+            ],
+            "confidence": 0.83
+          },
+          {
+            "position_px": [
+              2202.0,
+              1200.0
+            ],
+            "confidence": 0.69
+          },
+          {
+            "position_px": [
+              2698.0,
+              1205.0
+            ],
+            "confidence": 0.68
+          },
+          {
+            "position_px": null,
+            "confidence": 0.0
+          },
+          {
+            "position_px": [
+              2198.0,
+              1248.0
+            ],
+            "confidence": 0.7
+          }
+        ],
+        "size_class": "trailer",
+        "center_m": [
+          30.2,
+          2.8,
+          15.4
+        ],
+        "method": "pnp",
+        "confidence": 0.88
+      },
+      "embedding_crop_id": "box-B",
+      "confidences": {
+        "pose": 0.88,
+        "ocr": 0.0,
+        "text_match": 0.0
+      }
+    }
+  ]
+}

@@ -31,6 +31,10 @@ def main() -> int:
     parser.add_argument("--image", default=str(DEFAULT_IMAGE))
     parser.add_argument("--meta", default=str(DEFAULT_META))
     parser.add_argument("--backend-dir", default=str(DEFAULT_BACKEND))
+    parser.add_argument("--method", default="upright-tier",
+                        help="PnP method of the backend (upright-tier in the shipped configs)")
+    parser.add_argument("--min-corners", type=int, default=2,
+                        help="minimum visible corners per box (2 in the shipped configs)")
     args = parser.parse_args()
 
     image_path = Path(args.image).resolve()
@@ -58,7 +62,8 @@ def main() -> int:
     ctx = StageContext(
         store=store,
         stage_name="pose",
-        cfg={"backend_dir": args.backend_dir, "_base_dir": str(REPO_ROOT)},
+        cfg={"backend_dir": args.backend_dir, "method": args.method,
+             "min_corners": args.min_corners, "_base_dir": str(REPO_ROOT)},
         inputs={"image": store.path_for("input", "image_ref")},
     )
     PoseBackendStage().run(ctx)

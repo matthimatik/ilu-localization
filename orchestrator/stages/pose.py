@@ -121,6 +121,7 @@ class PoseBackendStage:
             ("--conf", "conf"),
             ("--kpt-conf", "kpt_conf"),
             ("--imgsz", "imgsz"),
+            ("--min-corners", "min_corners"),
         ):
             if key in ctx.cfg:
                 cmd += [flag, str(ctx.cfg[key])]
@@ -129,14 +130,12 @@ class PoseBackendStage:
             pos = camera.extrinsics.position_m
             rot = camera.extrinsics.rotation_euler_deg
             cmd += [
-                "--cam",
-                f"{pos[0]},{pos[1]},{pos[2]}",
-                "--rot",
-                f"{rot[0]},{rot[1]},{rot[2]}",
+                f"--cam={pos[0]},{pos[1]},{pos[2]}",
+                f"--rot={rot[0]},{rot[1]},{rot[2]}",
             ]
         if camera is not None:
             intr = camera.intrinsics
-            cmd += ["--f", f"{intr.fx},{intr.fy}", "--cx", str(intr.cx), "--cy", str(intr.cy)]
+            cmd += [f"--f={intr.fx},{intr.fy}", f"--cx={intr.cx}", f"--cy={intr.cy}"]
 
         self._run_backend(cmd, backend_dir, float(ctx.cfg.get("timeout_s", DEFAULT_TIMEOUT_S)))
 

@@ -575,7 +575,7 @@ def build_record_table(
     headers, rows = record_table_cells(records, text_spots, associations)
     note = (
         "id ↔ badge on the image · colour swatch = instance · "
-        "OCR texts = associated spots (text confidence) · box = pose method (pnp/yolo)"
+        "OCR texts = associated spots (text confidence) · box = pose method (backend solve/yolo)"
     )
     if has_masks:
         note += " · mint fill/outline = instance-segmentation mask"

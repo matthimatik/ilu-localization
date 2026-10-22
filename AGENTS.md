@@ -11,6 +11,8 @@ uv run pytest tests/test_dag_e2e.py::test_fixture_pipeline_end_to_end
 RUN_BACKEND_TESTS=1 uv run pytest tests/test_pose_backend.py tests/test_mmocr_backend.py  # needs GPU + sibling backends
 uv run python tools/run_pipeline.py                                 # fixture e2e (configs/pipeline.yaml)
 uv run python tools/run_pipeline.py --config configs/pipeline_pose.yaml  # real pose+mmocr backends
+uv run python tools/run_pipeline.py --config configs/examples/backends_v3_drone_137.yaml  # per-scene example
+uv run python tools/make_example_config.py v3_drone_137   # new example config (camera from the scene's meta.json)
 uv run python tools/run_pipeline.py --no-cache
 uv run python tools/visualize_run.py                 # end-result viz of newest successful run -> runs/<id>/viz/
 uv run python tools/visualize_run.py --run-id <id> --open
@@ -49,12 +51,13 @@ Pipeline order: `load_image → (pose/mmocr/fixtures) → associate → identify
 
 ## External backends (sibling directories, not vendored)
 
-- Pose: `../ilu-pose-estimation` — stage shells out to `uv run pipeline/run.py` there (needs `uv` on PATH, GPU). Default weights `models/container-corners-yolov8m-1280.pt` under that repo.
+- Pose: `../ilu-pose-estimation` — stage shells out to `uv run pipeline/run.py` there (needs `uv` on PATH, GPU). Default weights `models/container-corners-yolov8m-1280.pt` under that repo. The PnP variant comes from stage cfg `method` (all shipped backend configs use `upright-tier`: the discrete tier-constrained fit with the free-height upright as fallback; the backend default `pnp` applies when the key is absent). The constrained fits solve from 2 visible corners up, so the shipped configs also set `min_corners: 2` (backend default is 4). Other overrides: `conf` / `kpt_conf` / `imgsz` / `min_corners` / `timeout_s`.
 - Instance segmentation: `../ilu-detection` — stage shells out to `uv run python segmentation/infer.py` there (needs `uv` on PATH, GPU). Default weights `models/ilu-seg-yolov8m-1024.pt` (TRUDI v2, classes `container`/`tank_container`/`trailer`); overrides via stage cfg `weights` / `imgsz` / `conf` / `max_det` / `device`. Writes the `instances` artifact (`schemas/vision.py:Instances`); not yet consumed by `associate`/`fuse`.
-- OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the TRUDI id_text fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_200e_trudi`), default rec is RobustScanner fine-tuned on TRUDI id_text crops (`robustscanner_resnet31_20e_trudi`); config/weights paths resolve relative to the mmocr repo root, override with stage cfg `det` / `det_weights` / `rec` / `rec_weights`. Runner imports mmocr inside the backend venv.
+- OCR: `../mmocr` — stage runs `../mmocr/.venv/bin/python tools/mmocr_runner.py` (venv must already have mmocr installed). Default det is the synthetic-v1 fine-tuned DBNet++ (`dbnetpp_resnet50-dcnv2_fpnc_30e_synth_v1`, synth val Hmean 0.699), default rec is RobustScanner fine-tuned on synthetic-v1 crops (`robustscanner_resnet31_10e_synth_v1`, synth val word_acc 0.704); both start from the TRUDI checkpoints and target **synthetic imagery only** (they perform poorly on real TRUDI frames — pass `det` / `det_weights` / `rec_weights` to use the TRUDI or stock weights instead). config/weights paths resolve relative to the mmocr repo root, override with stage cfg `det` / `det_weights` / `rec` / `rec_weights`. Runner imports mmocr inside the backend venv.
 - Identification: `../ilu-identification` — stage runs `tools/identify_runner.py` (lives in **this** repo) in a **child process** via `sys.executable` (the identification lib needs only pydantic+numpy, already present). **Never import the identification package in-process**: both repos expose top-level `schemas/` and `core/` packages, which would collide. The runner does `sys.path.insert(0, backend_dir)` in its own interpreter. Override with stage cfg `python` / `runner` / `backend_dir`. Writes `schemas/identification.py:IdentifiedILUs`; `fuse` consumes it via the optional `ilu_ids` input.
 - Smoke-test each adapter alone: `uv run python tools/smoke_pose.py`, `uv run python tools/smoke_instanceseg.py`, `uv run python tools/smoke_mmocr.py`, `uv run python tools/smoke_identify.py`.
 - `configs/pipeline_backends.yaml` runs pose + instanceseg + mmocr on the synthetic drone scene; `configs/pipeline_pose.yaml` stays pose+mmocr only. Both include the identify stage after `associate`.
+- `configs/examples/` holds one full-backend config per synthetic scene (camera from that scene's `meta.json`): `uv run python tools/make_example_config.py <scene>` writes `configs/examples/backends_<scene>.yaml` for any scene of `../ilu-pose-estimation/datasets/synthetic-data-generation` (v3_default / v3_drone / v3_human / v3_reachstacker).
 
 ## Testing
 

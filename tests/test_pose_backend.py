@@ -133,6 +133,8 @@ def test_pose_backend_on_drone_scene(tmp_path):
         stage_name="pose",
         cfg={
             "backend_dir": str(REPO_ROOT / ".." / "ilu-pose-estimation"),
+            "method": "upright-tier",
+            "min_corners": 2,
             "_base_dir": str(REPO_ROOT),
         },
         inputs={"image": store.path_for("input", "image_ref")},

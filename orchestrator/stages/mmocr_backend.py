@@ -9,13 +9,13 @@ from orchestrator.stages.util import load_model, resolve_path
 from schemas.image import ImageRef
 from schemas.vision import TextSpot, TextSpots
 
-DEFAULT_DET = "configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.py"
+DEFAULT_DET = "configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_30e_synth_v1.py"
 DEFAULT_DET_WEIGHTS = (
-    "work_dirs/dbnetpp_trudi_200e/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.pth"
+    "work_dirs/dbnetpp_synth_v1_30e/dbnetpp_resnet50-dcnv2_fpnc_30e_synth_v1.pth"
 )
 DEFAULT_REC = "RobustScanner"
 DEFAULT_REC_WEIGHTS = (
-    "work_dirs/robustscanner_trudi_20e/robustscanner_resnet31_20e_trudi.pth"
+    "work_dirs/robustscanner_synth_v1_10e/robustscanner_resnet31_10e_synth_v1.pth"
 )
 DEFAULT_TIMEOUT_S = 600.0
 

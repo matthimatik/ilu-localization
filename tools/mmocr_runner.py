@@ -11,21 +11,24 @@ def main() -> int:
     parser.add_argument("--image", required=True)
     parser.add_argument(
         "--det",
-        default="configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.py",
+        default="configs/textdet/dbnetpp/dbnetpp_resnet50-dcnv2_fpnc_30e_synth_v1.py",
     )
     parser.add_argument(
         "--det-weights",
         default=(
-            "work_dirs/dbnetpp_trudi_200e/"
-            "dbnetpp_resnet50-dcnv2_fpnc_200e_trudi.pth"
+            "work_dirs/dbnetpp_synth_v1_30e/"
+            "dbnetpp_resnet50-dcnv2_fpnc_30e_synth_v1.pth"
         ),
     )
     parser.add_argument("--rec", default="RobustScanner")
     parser.add_argument(
         "--rec-weights",
-        default=None,
+        default=(
+            "work_dirs/robustscanner_synth_v1_10e/"
+            "robustscanner_resnet31_10e_synth_v1.pth"
+        ),
         help="recognition checkpoint path (release-layout .pth); "
-        "omit to use the stock RobustScanner weights",
+        "set to an empty string to use the stock RobustScanner weights",
     )
     parser.add_argument("--device", default=None)
     parser.add_argument("--out", required=True)
@@ -36,9 +39,9 @@ def main() -> int:
 
     inferencer = MMOCRInferencer(
         det=args.det,
-        det_weights=args.det_weights,
+        det_weights=args.det_weights or None,
         rec=args.rec,
-        rec_weights=args.rec_weights,
+        rec_weights=args.rec_weights or None,
         device=args.device,
     )
     result = inferencer(args.image, batch_size=1)

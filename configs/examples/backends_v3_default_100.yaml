@@ -1,0 +1,66 @@
+pipeline: backends-example
+stages:
+  - name: load_image
+    impl: load_image
+    cfg:
+      image: ../ilu-pose-estimation/datasets/synthetic-data-generation/v3_default_100/rgb.jpg
+      camera:
+        intrinsics:
+          fx: 5333.333333333333
+          fy: 5333.333333333333
+          cx: 1920.0
+          cy: 1080.0
+          width: 3840
+          height: 2160
+        extrinsics:
+          position_m: [-27.978025436401367, -42.996551513671875, 2.8363678455352783]
+          rotation_euler_deg: [90.84, -0.0, -17.89]
+  - name: pose
+    impl: pose
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      backend_dir: ../ilu-pose-estimation
+      method: upright-tier
+      min_corners: 2
+  - name: instanceseg
+    impl: instanceseg
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      backend_dir: ../ilu-detection
+  - name: textspots
+    impl: mmocr
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      backend_dir: ../mmocr
+  - name: embeddings
+    impl: fixture_embeddings
+    inputs:
+      image: load_image/image_ref
+    cfg:
+      source: tests/fixtures/embeddings_empty.json
+  - name: associate
+    impl: associate
+    inputs:
+      text_spots: textspots/text_spots
+      pose_boxes: pose/pose_boxes
+      embeddings: embeddings/embeddings
+  - name: identify
+    impl: identify
+    inputs:
+      associations: associate/associations
+      text_spots: textspots/text_spots
+      pose_boxes: pose/pose_boxes
+    cfg:
+      backend_dir: ../ilu-identification
+  - name: fuse
+    impl: fuse
+    inputs:
+      associations: associate/associations
+      text_spots: textspots/text_spots
+      pose_boxes: pose/pose_boxes
+      embeddings: embeddings/embeddings
+      image_ref: load_image/image_ref
+      ilu_ids: identify/ilu_ids

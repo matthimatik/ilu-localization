@@ -21,6 +21,8 @@ stages:
       image: load_image/image_ref
     cfg:
       backend_dir: ../ilu-pose-estimation
+      method: upright-tier
+      min_corners: 2
   - name: instanceseg
     impl: instanceseg
     inputs:

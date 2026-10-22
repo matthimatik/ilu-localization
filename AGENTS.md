@@ -14,6 +14,8 @@ uv run python tools/run_pipeline.py --config configs/pipeline_pose.yaml  # real 
 uv run python tools/run_pipeline.py --no-cache
 uv run python tools/visualize_run.py                 # end-result viz of newest successful run -> runs/<id>/viz/
 uv run python tools/visualize_run.py --run-id <id> --open
+uv run python tools/eval_run.py                    # end-to-end 3D eval vs pose.jsonl GT -> runs/<id>/eval/eval_report.json
+uv run python tools/eval_run.py --run-id <id> --gt path/to/pose.jsonl --center-thres-m 2.0
 uv run python tools/smoke_identify.py                # identify stage alone (needs ../ilu-identification)
 ```
 
@@ -21,7 +23,13 @@ No lint/typecheck/format tooling or CI is configured. Python `>=3.11`, managed w
 
 ## Layout
 
-Three importable packages at repo root (not `src/`): `schemas/` (pydantic models), `orchestrator/` (DAG engine + stage adapters under `orchestrator/stages/`), `core/` (pure logic: `association/`, `fusion/` incl. `iso6346`, `visualization/` for the result renderer). CLI entrypoints live in `tools/` (scripts that `sys.path.insert` the repo root; run them as files, not as installed console scripts). Pipeline YAMLs in `configs/`. Diagram: `High Level System Diagram for ILU Localization.drawio`.
+Three importable packages at repo root (not `src/`): `schemas/` (pydantic models), `orchestrator/` (DAG engine + stage adapters under `orchestrator/stages/`), `core/` (pure logic: `association/`, `fusion/` incl. `iso6346`, `evaluation/` for the end-to-end metric, `visualization/` for the result renderer). CLI entrypoints live in `tools/` (scripts that `sys.path.insert` the repo root; run them as files, not as installed console scripts). Pipeline YAMLs in `configs/`. Diagram: `High Level System Diagram for ILU Localization.drawio`.
+
+## Evaluation
+
+- `core/evaluation/` scores a completed run against synthetic-scene ground truth (`pose.jsonl`, one line per ILU: 8 world corners + visible flags + `label` carrying the ISO 6346 code): `ground_truth.py` (parser/`parse_iso_from_label`), `geometry.py` (`box_center`, `best_corner_errors` over all 8! corner correspondences so GT/pred corner orderings need not agree — box symmetries alone do not cover the generator's reflections, `voxel_iou3d`), `matching.py` (greedy 1-to-1 by ascending center distance, `average_precision` over a center-error threshold), `metrics.py`, `api.py` (`evaluate`).
+- Metrics (world 3D): precision/recall/F1 and AP at the center threshold, mean/median center error + mean corner error in metres, voxel IoU, and on matched pairs only the ISO exact / check-digit-relaxed accuracy and size accuracy. Predictions without PnP world corners are excluded from matching and listed as `pred_ids_without_world`.
+- `tools/eval_run.py` is a post-run tool, **not** a pipeline stage. Writes `<run>/eval/eval_report.json` (`schemas/evaluation.py:EvalReport`); flags `--run-id`, `--runs-root`, `--gt` (dir or `pose.jsonl`; default `pose.jsonl` beside the run's image), `--center-thres-m`, `--voxel-m`, `--include-fully-occluded-gt`, `--out`. Needs a pose-backend run — fixture runs have no world corners.
 
 ## Visualization
 
@@ -53,5 +61,6 @@ Pipeline order: `load_image → (pose/mmocr/fixtures) → associate → identify
 - Unit + fixture e2e always run. Backend integration tests are `@pytest.mark.skipif(RUN_BACKEND_TESTS != "1")`.
 - Golden test: `tests/test_dag_e2e.py::test_fixture_pipeline_matches_golden` compares full `fuse` output to `tests/golden/ilu_records.json`. Regenerate deliberately when fusion behavior changes (run fixture pipeline with `--no-cache`, copy `fuse/ilu_records.json` over the golden file, and re-copy to `docs/data/fixture-records.json`).
 - Visualization tests (`tests/test_visualization.py`) assert structure only (files written, table contents, no overlapping labels via placement helpers) — no golden images.
+- Evaluation tests (`tests/test_evaluation.py`, `tests/test_eval_tool.py`) are pure + fixture: no GPU, no backend checkout; the tool test builds a canned pose-backend run in `tmp_path`.
 - Builders in `tests/builders.py` (`make_spot`, `make_box`, `make_identified`, …) for vision and identification models; fixtures under `tests/fixtures/`.
 - The identify stage unit tests (`tests/test_identify_stage.py`) need the sibling `../ilu-identification` checkout for the end-to-end case (skipped if absent); translation tests are pure.

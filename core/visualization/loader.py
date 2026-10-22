@@ -58,7 +58,7 @@ def load_run(run_dir: Path | str, base_dir: Path | str) -> RunArtifacts:
     if not resolved.exists():
         raise FileNotFoundError(f"image not found: {resolved}")
 
-    world_by_id, camera = _load_pose_raw(run_dir)
+    world_by_id, camera = load_pose_raw(run_dir)
     return RunArtifacts(
         run_dir=run_dir,
         records=records,
@@ -73,7 +73,7 @@ def load_run(run_dir: Path | str, base_dir: Path | str) -> RunArtifacts:
     )
 
 
-def _load_pose_raw(run_dir: Path) -> tuple[dict[str, np.ndarray], dict | None]:
+def load_pose_raw(run_dir: Path) -> tuple[dict[str, np.ndarray], dict | None]:
     """Map `det-N` ids to PnP world corners via the same uv match as the stage."""
     world_by_id: dict[str, np.ndarray] = {}
     camera: dict | None = None

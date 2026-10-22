@@ -1,5 +1,6 @@
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 from orchestrator.cache import StageCache, stage_key
 from orchestrator.stage import StageContext, StageSpec
@@ -52,7 +53,16 @@ class Pipeline:
             input_paths[logical] = path
 
         typed_paths = {k: v for k, v in input_paths.items()}
-        key = stage_key(spec.stage, spec.cfg, typed_paths)
+        # Stages can declare extra files the output depends on (e.g. backend model
+        # weights); they are hashed into the cache key so replacing a file in place
+        # (a retrained checkpoint at the same path) invalidates the cache.
+        cache_paths: dict[str, Path] = dict(typed_paths)
+        declared = getattr(spec.stage, "cache_files", None)
+        if callable(declared):
+            for logical, path in declared(spec.cfg).items():
+                if Path(path).is_file():
+                    cache_paths[str(logical)] = Path(path)
+        key = stage_key(spec.stage, spec.cfg, cache_paths)
         t0 = time.monotonic()
         try:
             if cache is not None and cache.get(key, spec.name, store):

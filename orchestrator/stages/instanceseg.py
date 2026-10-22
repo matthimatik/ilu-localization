@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 
 from orchestrator.stage import StageContext
-from orchestrator.stages.util import load_model, resolve_path
+from orchestrator.stages.util import load_model, resolve_path, resolve_weights
 from schemas.image import ImageRef
 from schemas.vision import Instance, Instances
 
@@ -30,6 +30,11 @@ def instances_from_runner(data: dict, image_path: str) -> Instances:
 class InstancesegBackendStage:
     name = "instanceseg"
 
+    def cache_files(self, cfg: dict) -> dict[str, Path]:
+        # The output depends on the checkpoint content, not just its path:
+        # hashing it invalidates cached instances after a weights swap.
+        return {"weights": resolve_weights(cfg, DEFAULT_WEIGHTS)}
+
     def run(self, ctx: StageContext) -> None:
         image_ref = load_model(ctx, "image", ImageRef)
         backend_dir = resolve_path(ctx, "backend_dir")
@@ -42,9 +47,7 @@ class InstancesegBackendStage:
         if not image_path.exists():
             raise FileNotFoundError(f"image not found: {image_path}")
 
-        weights = Path(ctx.cfg.get("weights", DEFAULT_WEIGHTS))
-        if not weights.is_absolute():
-            weights = backend_dir / weights
+        weights = resolve_weights(ctx.cfg, DEFAULT_WEIGHTS)
 
         out_path = ctx.store.stage_dir(ctx.stage_name) / "raw" / "instances.json"
         out_path.parent.mkdir(parents=True, exist_ok=True)

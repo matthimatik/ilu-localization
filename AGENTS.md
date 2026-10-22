@@ -37,7 +37,7 @@ Pipeline order: `load_image → (pose/mmocr/fixtures) → associate → identify
 - New stage types must be registered in `orchestrator/registry.py` `_REGISTRY` (string `impl` in YAML → class). Implement the `Stage` protocol (`name` attr, `run(ctx)`); write results with `ctx.store.write_model`.
 - `orchestrator/config.py:build_pipeline` injects `_base_dir` into every stage `cfg` — relative paths in YAML resolve against it (repo root when using `tools/run_pipeline.py`). Use `resolve_path(ctx, key)` for cfg path keys.
 - First failed stage aborts the run (`orchestrator/dag.py`); the `manifest` is rewritten after each stage. Stage output hashing only globs `*.json` directly in the stage dir (not `raw/` subdirs).
-- Content-addressed stage cache in `.cache/stages` (key: stage class + cfg JSON + input file hashes). `--no-cache` bypasses; cache copies only top-level files, not subdirectories like `raw/`. The cache does **not** hash sibling source code — after changing `../ilu-identification`, rerun with `--no-cache`.
+- Content-addressed stage cache in `.cache/stages` (key: stage class + cfg JSON + input file hashes; the `pose` and `instanceseg` stages additionally hash the content of their resolved backend weights file, so a retrained/replaced checkpoint at the same path invalidates the cache). `--no-cache` bypasses; cache copies only top-level files, not subdirectories like `raw/`. The cache does **not** hash sibling source code — after changing `../ilu-identification` (or the backend repos' code), rerun with `--no-cache`.
 
 ## External backends (sibling directories, not vendored)
 
